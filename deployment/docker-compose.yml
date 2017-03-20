@@ -1,0 +1,82 @@
+version: '2'
+
+services:
+    mario_rabbitmq:
+        container_name: mario_rabbitmq
+        image: rabbitmq:management
+        ports:
+            - "5672:5672"
+            - "15672:15672"
+        restart: on-failure:10
+        network_mode: "bridge"
+
+    front_app:
+        container_name: front_app
+        command: /venv/bin/python3.6 /app_root/mario/front_app.py
+        volumes:
+            - ../mario:/app_root/mario
+        links:
+            - mario_rabbitmq
+        build:
+            context: ../
+            dockerfile: ./deployment/Dockerfile.front_app
+        ports:
+            - "8080:8080"
+        restart: on-failure:1
+        network_mode: "bridge"
+        logging:
+            driver: "json-file"
+        tty: true
+
+    node_manager_app:
+        container_name: node_manager_app
+        command: /venv/bin/python3.6 /app_root/mario/node_manager_app.py
+        volumes:
+            - ../mario:/app_root/mario
+        links:
+            - mario_rabbitmq
+        depends_on:
+            - mario_rabbitmq
+        build:
+            context: ../
+            dockerfile: ./deployment/Dockerfile.front_app
+        restart: on-failure:1
+        network_mode: "bridge"
+        logging:
+            driver: "json-file"
+        tty: true
+
+    node_app:
+        container_name: node_app
+        command: /venv/bin/python3.6 /app_root/mario/node_app.py
+        depends_on:
+            - node_manager_app
+        volumes:
+            - ../mario:/app_root/mario
+        links:
+            - mario_rabbitmq
+        build:
+            context: ../
+            dockerfile: ./deployment/Dockerfile.front_app
+        restart: on-failure:20
+        network_mode: "bridge"
+        logging:
+            driver: "json-file"
+        tty: true
+#    node_app1:
+#        container_name: node_app1
+#        command: /venv/bin/python3.6 /app_root/mario/node_app.py
+#        depends_on:
+#            - node_manager_app
+#        volumes:
+#            - ../mario:/app_root/mario
+#        links:
+#            - mario_rabbitmq
+#        build:
+#            context: ../
+#            dockerfile: ./deployment/Dockerfile.front_app
+#        restart: on-failure:20
+#        network_mode: "bridge"
+#        logging:
+#            driver: "json-file"
+#        tty: true

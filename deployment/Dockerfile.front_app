@@ -1,0 +1,9 @@
+FROM arwineap/docker-ubuntu-python3.6:latest
+RUN apt-get -qq update
+RUN apt-get -y install python-dev
+RUN pip install virtualenv
+RUN virtualenv  /venv -p python3.6
+
+ADD ./requirements.txt /app_root/requirements.txt
+
+RUN /venv/bin/pip3.6 install -r /app_root/requirements.txt

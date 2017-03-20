@@ -1,0 +1,6 @@
+aiohttp
+asynqp
+pika
+
+aio-pika
+requests

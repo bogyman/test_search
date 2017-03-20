@@ -12,3 +12,7 @@ API:
 - q - words
 - scoring by amount of words from query in document
 
+
+
+Can be scalled by start more than one Node service. Simple move to multi NodeManager.
+Node instances should be memory opimized. NodeManager instances should be cpu opimized.

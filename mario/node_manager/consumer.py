@@ -1,20 +1,21 @@
 import json
 import uuid
+from collections import defaultdict
 from functools import partial
 from itertools import groupby, chain
 
 from node_manager.helpers import tockenizer, analizer, sharding, get_terms, get_node_by_document_hash
 from node_manager.nodes_holder import NodesHolder
 from utils import BaseMario, BaseMarioMixin
-from utils.data_source import fetch_resources, get_iterations_per_node, get_nodes_tasks
+from utils.data_source import fetch_resources, get_nodes_offsets, get_nodes_tasks
 
 
 class NodeManager(BaseMario):
     def __init__(self):
         self.queue_callbacks = (
-            ('node__init', self.on_init_node),
-            ('front__search', self.on_front_search),
-            ('front__index', self.on_front_index),
+            ('node__init', self.on_init_node, 'mario'),
+            ('front__search', self.on_front_search, 'mario'),
+            ('front__index', self.on_front_index, 'mario'),
         )
 
         super(NodeManager, self).__init__()
@@ -88,18 +89,32 @@ class SearchManager(BaseMarioMixin):
 
         if all(self.terms_to_document_hashes.values()):
             if self.terms_to_document_hashes:
-                self.calculate_results(chain(*self.terms_to_document_hashes.values()))
+                self.calculate_results(self.terms_to_document_hashes)
             else:
                 # no results
                 self.send_result(result={})
 
-    def calculate_results(self, hashes_list):
+    def calculate_results(self, terms_to_document_hashes):
         """
         Calculate scores for each document
-        :param hashes_list:
+        :param terms_to_document_hashes:
         :return:
         """
-        self.documents_order = dict([(i, len(list(j))) for i, j in groupby(hashes_list)])
+        result_hashes = set.intersection(*[set(val.keys()) for val in terms_to_document_hashes.values()])
+        result = defaultdict(list)
+        for term, hash_to_position in terms_to_document_hashes.items():
+            for _hash in result_hashes:
+                result[_hash].append(hash_to_position[_hash])
+
+        def _get_score(positions):
+            if len(positions) == 1:
+                return 0
+            positions.sort()
+            return positions[-1] - positions[0]
+
+        print(result)
+
+        self.documents_order = {_hash: _get_score(positions) for _hash, positions in result.items()}
 
         self.get_documents(self.documents_order.keys())
 
@@ -109,7 +124,7 @@ class SearchManager(BaseMarioMixin):
         :param document_hashes:
         :return:
         """
-        print('get_documents', document_hashes)
+        print('get_documents')
         for document_hash in document_hashes:
             self.documents_result[document_hash] = None
 
@@ -174,27 +189,30 @@ class IndexManager(BaseMarioMixin):
         :return:
         """
         platforms_count = fetch_resources()
-        nodes_iterations = get_iterations_per_node(NodesHolder, platforms_count)
-        nodes_tasks = get_nodes_tasks(nodes_iterations)
+        nodes_offsets = get_nodes_offsets(NodesHolder, platforms_count)
+        nodes_tasks = get_nodes_tasks(nodes_offsets)
 
+        delay = 0
         for node, urls in nodes_tasks.items():
             for url in urls:
-                self.make_task(node, url)
+                self.make_task(node, url, delay)
+                delay += 1000
 
-    def make_task(self, node, url):
+    def make_task(self, node, url, delay):
         """
         Make task for fetching url by node
         :param node:
         :param url:
         :return:
         """
-        task_queue_name = "make_task" + str(uuid.uuid4())
+        task_queue_name = str(uuid.uuid4())
         self.consume(task_queue_name, self.index_documents)
 
-        self.publish(
+        self.publish_delayed(
             payload=json.dumps({"url": url}),
             queue_name=f"node__get_resource__{node}",
-            reply_to=task_queue_name
+            reply_to=task_queue_name,
+            delay=delay
         )
 
     def index_documents(self, ch, method, props, body):
@@ -210,7 +228,6 @@ class IndexManager(BaseMarioMixin):
         data = json.loads(body)
         for document in data:
             terms = get_terms(document)
-            print(document['name'])
             for node, payload in sharding(NodesHolder.get_nodes(), terms, document).items():
                 self.publish(
                     payload=json.dumps(payload),

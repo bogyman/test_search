@@ -7,10 +7,21 @@ API:
 /index 
 - force indexing process
 
-/search?q=<q>
+/search?q=super mario
 - return documents(if found) ordered by score
 - q - words
-- scoring by amount of words from query in document
+--- scoring by amount of words from query in document ---
+
+
+
+Updated:
+
+- added timeout between requests to external API
+- increased limit for request to external API
+- added serialization of API response
+- storing term position
+- use logical AND for requested terms
+- changed scoring by distance between terms
 
 
 

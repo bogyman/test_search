@@ -21,11 +21,17 @@ class BaseMarioMixin:
             self.channel = connection.channel()
             self.channel.basic_qos(prefetch_count=1)
             self.channel.exchange_declare(exchange='mario', type='direct', durable=True)
+            self.channel.exchange_declare(
+                exchange='scheduled_exchange',
+                type='x-delayed-message',
+                durable=True,
+                arguments={'x-delayed-type': 'direct'}
+            )
 
-    def consume(self, queue_name, cb):
+    def consume(self, queue_name, cb, exchange='mario'):
         self.channel.queue_declare(queue=queue_name, durable=True)
         self.channel.queue_bind(
-            exchange='mario',
+            exchange=exchange,
             queue=queue_name,
         )
         self.channel.basic_consume(cb, queue=queue_name, no_ack=True)
@@ -35,6 +41,17 @@ class BaseMarioMixin:
             exchange='mario',
             routing_key=queue_name,
             properties=reply_to and pika.BasicProperties(reply_to=reply_to) or None,
+            body=payload
+        )
+
+    def publish_delayed(self, queue_name, payload, reply_to, delay):
+        self.channel.basic_publish(
+            exchange='scheduled_exchange',
+            routing_key=queue_name,
+            properties=pika.BasicProperties(
+                headers={'x-delay': delay},
+                reply_to=reply_to
+            ),
             body=payload
         )
 
@@ -49,8 +66,8 @@ class BaseMario(BaseMarioMixin):
         super().__init__()
 
         if self.queue_callbacks:
-            for queue_name, cb in self.queue_callbacks:
-                self.consume(queue_name, cb)
+            for queue_name, cb, exchange in self.queue_callbacks:
+                self.consume(queue_name, cb, exchange)
 
     def start(self):
         self.channel.start_consuming()

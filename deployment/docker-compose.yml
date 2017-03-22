@@ -3,12 +3,15 @@ version: '2'
 services:
     mario_rabbitmq:
         container_name: mario_rabbitmq
-        image: rabbitmq:management
+        build:
+            context: ../
+            dockerfile: ./deployment/Dockerfile.rabbitmq
         ports:
             - "5672:5672"
             - "15672:15672"
         restart: on-failure:10
         network_mode: "bridge"
+        tty: true
 
     front_app:
         container_name: front_app

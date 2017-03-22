@@ -8,5 +8,16 @@ def store_document(document_hash, document):
 
 
 def store_terms(document_hash, terms):
-    for term in terms:
-        Dict.save(document_hash, term)
+    for position, term in enumerate(terms):
+        Dict.save((document_hash, position), term)
+
+
+# should something like serializer
+def make_document(item):
+    return {
+        'deck': item['deck'],
+        'image': item['image'] and item['image'].get('icon_url'),
+        'name': item['name'],
+        'platforms': [pl['name'] for pl in item['platforms']],
+        'site_detail_url': item['site_detail_url']
+    }

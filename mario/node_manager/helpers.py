@@ -42,7 +42,7 @@ def sharding(nodes, terms, document=None):
     :param document:
     :return:
     """
-    shards = defaultdict(lambda: defaultdict(set))
+    shards = defaultdict(lambda: defaultdict(list))
     document_hash = None
 
     if document:
@@ -52,13 +52,8 @@ def sharding(nodes, terms, document=None):
         shards[node]['document_hash'] = document_hash
 
     for term in terms:
-        shards[get_node_by_term(nodes, term)]['terms'].add(term)
+        shards[get_node_by_term(nodes, term)]['terms'].append(term)
         shards[get_node_by_term(nodes, term)]['document_hash'] = document_hash
-
-    # hack for json.dumps
-    for node, data in shards.items():
-        if data.get('terms'):
-            data['terms'] = list(data['terms'])
 
     return shards
 
